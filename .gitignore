@@ -1,0 +1,49 @@
+# Gradle
+.gradle/
+build/
+*/build/
+
+# Local configuration file (SDK path 등)
+local.properties
+
+# Log files
+*.log
+
+# Android Studio
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated files
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Keystore (중요 - 절대 올리면 안됨)
+*.jks
+*.keystore
+
+# APK / AAB (빌드 결과물)
+*.apk
+*.aab
+
+# Firebase / Google Services (필요시 제외)
+google-services.json
+
+# Kotlin
+*.kotlin_module
+
+# Navigation Safe Args
+.navigation/
+
+# IntelliJ
+out/
+
+# NDK
+obj/
+
+# Project specific
+bugreport*.zip
