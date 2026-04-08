@@ -285,3 +285,7 @@ long[] shape = new long[]{1, 3, 224, 224};
 ## 🧾 한 줄 요약
 
 👉 **PyTorch 모델 → ExecuTorch(.pte) → Android(Java)에서 실행**
+
+## 기타
+
+Windows 기능 켜기/끄기에서 Windows 하이퍼바이저 플랫폼 활성화
