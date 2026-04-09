@@ -1,0 +1,1 @@
+@"%USERPROFILE%\AppData\Local\Android\Sdk\platform-tools\adb.exe" start-server

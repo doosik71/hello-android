@@ -1,0 +1,2 @@
+"%USERPROFILE%\AppData\Local\Android\Sdk\platform-tools\adb.exe" shell am start -n com.example.helloandroid/.MainActivity
+@rem "%USERPROFILE%\AppData\Local\Android\Sdk\platform-tools\adb.exe" shell monkey -p com.example.helloandroid -c android.intent.category.LAUNCHER 1
