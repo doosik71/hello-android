@@ -1,291 +1,66 @@
-# 📱 Android + ExecuTorch 딥러닝 모델 실행 실습
+# Android + ExecuTorch MobileNetV2 (이미지 분류)
 
-이 문서는 **Hugging Face / PyTorch 모델을 ExecuTorch로 변환하여 Android(Java) 앱에서 실행하는 방법**을 단계별로 설명합니다.
+이 프로젝트는 **MobileNetV2 ExecuTorch 모델(`.pte`)을 Android(Java)에서 실행**해 사진 분류 결과를 보여줍니다.
 
-## 🎯 목표
+## 현재 구현 상태
 
-* PyTorch / Hugging Face 모델을 `.pte`로 변환
-* Android 앱에서 모델 로드 및 추론 실행
-* Java 기반 Android 프로젝트에서 딥러닝 실행 성공
+- 모델 로드 및 추론 실행
+- 이미지 입력 지원 (사진 1장 선택)
+- 입력 전처리: `224x224` 리사이즈, ImageNet Normalize, `NCHW` 변환
+- 결과 후처리: Softmax 확률 계산
+- 화면 출력: **Top-1 / Top-5 라벨 + 스코어(%)**
+- 이미지 선택 경로 2개 제공
+  - `Pick Photo`: Android Photo Picker (갤러리)
+  - `Pick Image File`: 파일 앱(OpenDocument)
 
-## 🧱 전체 흐름
+## 모델 입출력
 
-```text
-Hugging Face 모델
-        ↓
-ExecuTorch로 변환 (.pte)
-        ↓
-Android 프로젝트 assets에 추가
-        ↓
-Java 코드에서 로드 및 실행
-```
+- 입력 텐서: `1 x 3 x 224 x 224`
+- 출력 텐서: `1000` 클래스 logits (ImageNet)
 
-## 🖥️ 1. PC 환경 준비
+## 라벨 파일
 
-### 1. Python 환경 생성
+- 앱에서 읽는 위치: `app/src/main/assets/labels.txt`
+- 현재 `data/ImageNetLabels.txt`를 `assets/labels.txt`로 복사해 사용
+- 라벨 파일이 `1001`줄이고 첫 줄이 `background`인 경우, 앱에서 자동으로 첫 줄을 제거해 `1000` 클래스와 인덱스를 맞춤
 
-```bash
-python -m venv venv
-source venv/bin/activate   ## Windows: venv\Scripts\activate
-```
-
-### 2. ExecuTorch 설치
-
-```bash
-pip install executorch
-```
-
-### 3. Hugging Face 변환 도구 설치
-
-```bash
-git clone https://github.com/huggingface/optimum-executorch.git
-cd optimum-executorch
-pip install .
-```
-
-## 🤖 2. Hugging Face 모델 변환
-
-### 기본 명령어
-
-```bash
-optimum-cli export executorch \
-  --model <MODEL_ID> \
-  --task <TASK> \
-  --recipe xnnpack \
-  --output_dir exported_model
-```
-
-### 예시
-
-```bash
-optimum-cli export executorch \
-  --model HuggingFaceTB/SmolLM2-135M \
-  --task text-generation \
-  --recipe xnnpack \
-  --output_dir exported_model
-```
-
-### 결과
-
-```text
-exported_model/
- └─ model.pte   ← 이 파일 사용
-```
-
-## 📦 3. Android 프로젝트 설정
-
-### 1. 의존성 추가
-
-`app/build.gradle`
-
-```gradle
-dependencies {
-    implementation("org.pytorch:executorch-android:1.0.0")
-}
-```
-
-### 2. Gradle Sync
-
-```text
-File → Sync Project with Gradle Files
-```
-
-### 3. 모델 파일 추가
-
-```text
-app/src/main/assets/model.pte
-```
-
-## 🧠 4. ModelRunner.java
-
-```java
-package com.example.helloandroid;
-
-import android.content.Context;
-
-import org.pytorch.executorch.EValue;
-import org.pytorch.executorch.Module;
-import org.pytorch.executorch.Tensor;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-
-public class ModelRunner {
-
-    private final Module module;
-
-    public ModelRunner(Context context) throws Exception {
-        String modelPath = assetFilePath(context, "model.pte");
-        module = Module.load(modelPath);
-    }
-
-    public float[] run(float[] input, long[] shape) {
-        Tensor inputTensor = Tensor.fromBlob(input, shape);
-        EValue[] outputs = module.forward(EValue.from(inputTensor));
-        return outputs[0].toTensor().getDataAsFloatArray();
-    }
-
-    private static String assetFilePath(Context context, String assetName) throws Exception {
-        File file = new File(context.getFilesDir(), assetName);
-
-        if (file.exists() && file.length() > 0) {
-            return file.getAbsolutePath();
-        }
-
-        try (InputStream is = context.getAssets().open(assetName);
-             FileOutputStream os = new FileOutputStream(file)) {
-
-            byte[] buffer = new byte[4096];
-            int read;
-            while ((read = is.read(buffer)) != -1) {
-                os.write(buffer, 0, read);
-            }
-        }
-
-        return file.getAbsolutePath();
-    }
-}
-```
-
-## 📱 5. MainActivity.java
-
-```java
-package com.example.helloandroid;
-
-import android.os.Bundle;
-import android.widget.Button;
-import android.widget.TextView;
-
-import androidx.appcompat.app.AppCompatActivity;
-
-public class MainActivity extends AppCompatActivity {
-
-    private TextView resultText;
-    private ModelRunner modelRunner;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        resultText = findViewById(R.id.resultText);
-        Button runButton = findViewById(R.id.runButton);
-
-        try {
-            modelRunner = new ModelRunner(this);
-        } catch (Exception e) {
-            resultText.setText("Model load failed: " + e.getMessage());
-            return;
-        }
-
-        runButton.setOnClickListener(v -> {
-            try {
-                float[] input = new float[1 * 3 * 224 * 224];
-                long[] shape = new long[]{1, 3, 224, 224};
-
-                float[] output = modelRunner.run(input, shape);
-
-                resultText.setText("Output length: " + output.length);
-
-            } catch (Exception e) {
-                resultText.setText("Inference failed: " + e.getMessage());
-            }
-        });
-    }
-}
-```
-
-## 🖼️ 6. activity_main.xml
-
-```xml
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
-    <Button
-        android:id="@+id/runButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Run Model" />
-
-    <TextView
-        android:id="@+id/resultText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Result will appear here"
-        android:paddingTop="20dp" />
-</LinearLayout>
-```
-
-## 📁 프로젝트 구조
-
-```text
-app/
- └─ src/
-     └─ main/
-         ├─ java/com/example/helloandroid/
-         │   ├─ MainActivity.java
-         │   └─ ModelRunner.java
-         │
-         ├─ res/layout/
-         │   └─ activity_main.xml
-         │
-         └─ assets/
-             └─ model.pte
-```
-
-## 🚀 실행 방법
+## 실행 방법
 
 1. 앱 실행
-2. "Run Model" 버튼 클릭
-3. 결과 출력 확인
+2. 이미지 선택
+   - 갤러리에서 선택: `Pick Photo`
+   - 파일 앱에서 선택: `Pick Image File`
+3. `Run Model` 클릭
+4. 결과 확인
 
-## ⚠️ 주의사항
+예시 출력:
 
-### 1. 모델 입력 shape 맞추기
+```text
+Top-1: tabby cat (83.41%)
 
-```java
-long[] shape = new long[]{1, 3, 224, 224};
+Top-5:
+1. tabby cat - 83.41%
+2. tiger cat - 9.72%
+3. Egyptian cat - 3.10%
+4. lynx - 1.45%
+5. Siamese cat - 0.88%
 ```
 
-👉 export할 때 사용한 shape와 동일해야 함
-
-### 2. 모델마다 전처리 다름
-
-* normalization 필요할 수 있음
-* 채널 순서 (NCHW vs NHWC)
-
-### 3. 지원되지 않는 모델
-
-* 일부 Hugging Face 모델은 export 실패
-* Optimum ExecuTorch 지원 모델만 사용
-
-### 4. 처음에는 CPU (xnnpack) 사용
+## 빌드
 
 ```bash
---recipe xnnpack
+./gradlew :app:assembleDebug
 ```
 
-## 🔥 추천 실습 순서
+## 주요 코드 위치
 
-1. torchvision MobileNetV2로 `.pte` 생성
-2. Android에서 실행 성공
-3. Hugging Face 모델로 확장
-
-## 💡 확장 아이디어
-
-* 카메라 입력 연결
-* 실시간 추론
-* GPU / NPU 가속
-* UI 개선
-
-## 🧾 한 줄 요약
-
-👉 **PyTorch 모델 → ExecuTorch(.pte) → Android(Java)에서 실행**
-
-## 기타
-
-Windows 기능 켜기/끄기에서 Windows 하이퍼바이저 플랫폼 활성화
+- `app/src/main/java/com/example/helloandroid/MainActivity.java`
+  - Photo Picker / OpenDocument 연동
+  - 이미지 디코딩 및 전처리
+  - softmax + Top-K 계산 및 UI 출력
+- `app/src/main/java/com/example/helloandroid/ModelRunner.java`
+  - `model.pte` 로드 및 ExecuTorch 추론 실행
+- `app/src/main/res/layout/activity_main.xml`
+  - `Pick Photo`, `Pick Image File`, `Run Model`, 결과 텍스트 UI
+- `app/src/main/assets/model.pte`
+- `app/src/main/assets/labels.txt`

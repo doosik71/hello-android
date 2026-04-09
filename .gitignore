@@ -46,4 +46,6 @@ out/
 obj/
 
 # Project specific
+git_commit_message.txt
+.codex
 bugreport*.zip
