@@ -64,3 +64,7 @@ Top-5:
   - `Pick Photo`, `Pick Image File`, `Run Model`, 결과 텍스트 UI
 - `app/src/main/assets/model.pte`
 - `app/src/main/assets/labels.txt`
+
+## 실행 결과 화면
+
+![실행 결과 화면](./data/screen.png)
